@@ -1,24 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>2.5.0</Version>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Copyright>Copyright (c) OUTMATIC Alessandro Petrelli &amp; Contributors</Copyright>
-    <Authors>Alessandro Petrelli &amp; Contributors</Authors>
-    <Company>OUTMATIC Alessandro Petrelli</Company>
-    <PackageProjectUrl>https://github.com/outmatic/MongoDbCache</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/outmatic/MongoDbCache</RepositoryUrl>
-    <Description>A distributed cache implementation based on MongoDb, inspired by RedisCache and SqlServerCache</Description>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageId>Nefarius.AspNetCore.MongoDbCache</PackageId>
-    <RootNamespace>Nefarius.AspNetCore.MongoDbCache</RootNamespace>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <Version>2.5.0</Version>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Copyright>Copyright (c) OUTMATIC Alessandro Petrelli &amp; Contributors</Copyright>
+        <Authors>Alessandro Petrelli &amp; Contributors</Authors>
+        <Company>OUTMATIC Alessandro Petrelli</Company>
+        <PackageProjectUrl>https://github.com/outmatic/MongoDbCache</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/outmatic/MongoDbCache</RepositoryUrl>
+        <Description>A distributed cache implementation based on MongoDb, inspired by RedisCache and SqlServerCache</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <AssemblyName>Nefarius.AspNetCore.MongoDbCache</AssemblyName>
+        <PackageId>Nefarius.AspNetCore.MongoDbCache</PackageId>
+        <RootNamespace>Nefarius.AspNetCore.MongoDbCache</RootNamespace>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.1" />
-    <PackageReference Include="MongoDB.Driver" Version="3.1.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.1"/>
+        <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.1"/>
+        <PackageReference Include="MongoDB.Driver" Version="3.1.0"/>
+    </ItemGroup>
 
 </Project>
