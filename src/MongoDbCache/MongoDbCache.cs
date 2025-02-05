@@ -4,50 +4,29 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 
-namespace MongoDbCache
+namespace Nefarius.AspNetCore.MongoDbCache
 {
     public class MongoDbCache : IDistributedCache
     {
-        private DateTimeOffset _lastScan = DateTimeOffset.UtcNow;
-        private TimeSpan _scanInterval;
         private readonly TimeSpan _defaultScanInterval = TimeSpan.FromMinutes(5);
         private readonly MongoContext _mongoContext;
-
-        private static void ValidateOptions(MongoDbCacheOptions cacheOptions)
-        {
-            if (!string.IsNullOrEmpty(cacheOptions.ConnectionString) && cacheOptions.MongoClientSettings != null)
-                throw new ArgumentException($"Only one of {nameof(cacheOptions.ConnectionString)} and {nameof(cacheOptions.MongoClientSettings)} can be set.");
-            
-            if (string.IsNullOrEmpty(cacheOptions.ConnectionString) && cacheOptions.MongoClientSettings == null)
-                throw new ArgumentException($"{nameof(cacheOptions.ConnectionString)} or {nameof(cacheOptions.MongoClientSettings)} cannot be empty or null.");
-
-            if (string.IsNullOrEmpty(cacheOptions.DatabaseName))
-                throw new ArgumentException($"{nameof(cacheOptions.DatabaseName)} cannot be empty or null.");
-
-            if (string.IsNullOrEmpty(cacheOptions.CollectionName))
-                throw new ArgumentException($"{nameof(cacheOptions.CollectionName)} cannot be empty or null.");
-        }
-
-        private void SetScanInterval(TimeSpan? scanInterval)
-        {
-            _scanInterval = scanInterval?.TotalSeconds > 0
-                ? scanInterval.Value
-                : _defaultScanInterval;
-        }
+        private DateTimeOffset _lastScan = DateTimeOffset.UtcNow;
+        private TimeSpan _scanInterval;
 
         public MongoDbCache(IOptions<MongoDbCacheOptions> optionsAccessor)
         {
             var options = optionsAccessor.Value;
             ValidateOptions(options);
 
-            _mongoContext = new MongoContext(options.ConnectionString, options.MongoClientSettings, options.DatabaseName, options.CollectionName);
-            
+            _mongoContext = new MongoContext(options.ConnectionString, options.MongoClientSettings,
+                options.DatabaseName, options.CollectionName);
+
             SetScanInterval(options.ExpiredScanInterval);
         }
 
         public byte[] Get(string key)
         {
-            var value = _mongoContext.GetCacheItem(key, withoutValue: false);
+            var value = _mongoContext.GetCacheItem(key, false);
 
             ScanAndDeleteExpired();
 
@@ -63,21 +42,22 @@ namespace MongoDbCache
 
         public void Refresh(string key)
         {
-            _mongoContext.GetCacheItem(key, withoutValue: true);
+            _mongoContext.GetCacheItem(key, true);
 
             ScanAndDeleteExpired();
         }
 
         public async Task<byte[]> GetAsync(string key, CancellationToken token = default)
         {
-            var value = await _mongoContext.GetCacheItemAsync(key, withoutValue: false, token: token);
+            var value = await _mongoContext.GetCacheItemAsync(key, false, token);
 
             ScanAndDeleteExpired();
 
             return value;
         }
 
-        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
+        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options,
+            CancellationToken token = default)
         {
             await _mongoContext.SetAsync(key, value, options, token);
 
@@ -86,7 +66,7 @@ namespace MongoDbCache
 
         public async Task RefreshAsync(string key, CancellationToken token = default)
         {
-            await _mongoContext.GetCacheItemAsync(key, withoutValue: true, token: token);
+            await _mongoContext.GetCacheItemAsync(key, true, token);
 
             ScanAndDeleteExpired();
         }
@@ -103,6 +83,30 @@ namespace MongoDbCache
             _mongoContext.Remove(key);
 
             ScanAndDeleteExpired();
+        }
+
+        private static void ValidateOptions(MongoDbCacheOptions cacheOptions)
+        {
+            if (!string.IsNullOrEmpty(cacheOptions.ConnectionString) && cacheOptions.MongoClientSettings != null)
+                throw new ArgumentException(
+                    $"Only one of {nameof(cacheOptions.ConnectionString)} and {nameof(cacheOptions.MongoClientSettings)} can be set.");
+
+            if (string.IsNullOrEmpty(cacheOptions.ConnectionString) && cacheOptions.MongoClientSettings == null)
+                throw new ArgumentException(
+                    $"{nameof(cacheOptions.ConnectionString)} or {nameof(cacheOptions.MongoClientSettings)} cannot be empty or null.");
+
+            if (string.IsNullOrEmpty(cacheOptions.DatabaseName))
+                throw new ArgumentException($"{nameof(cacheOptions.DatabaseName)} cannot be empty or null.");
+
+            if (string.IsNullOrEmpty(cacheOptions.CollectionName))
+                throw new ArgumentException($"{nameof(cacheOptions.CollectionName)} cannot be empty or null.");
+        }
+
+        private void SetScanInterval(TimeSpan? scanInterval)
+        {
+            _scanInterval = scanInterval?.TotalSeconds > 0
+                ? scanInterval.Value
+                : _defaultScanInterval;
         }
 
         private void ScanAndDeleteExpired()

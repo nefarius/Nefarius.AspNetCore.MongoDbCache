@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
-namespace MongoDbCache
+namespace Nefarius.AspNetCore.MongoDbCache
 {
     public class MongoDbCacheOptions : IOptions<MongoDbCacheOptions>
     {

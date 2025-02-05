@@ -11,6 +11,8 @@
     <RepositoryUrl>https://github.com/outmatic/MongoDbCache</RepositoryUrl>
     <Description>A distributed cache implementation based on MongoDb, inspired by RedisCache and SqlServerCache</Description>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>Nefarius.AspNetCore.MongoDbCache</PackageId>
+    <RootNamespace>Nefarius.AspNetCore.MongoDbCache</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

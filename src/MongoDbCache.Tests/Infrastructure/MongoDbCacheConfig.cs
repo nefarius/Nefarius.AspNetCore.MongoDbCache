@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using System;
 using MongoDB.Driver;
+using Nefarius.AspNetCore.MongoDbCache;
 
 namespace MongoDbCache.Tests.Infrastructure
 {
@@ -11,7 +12,7 @@ namespace MongoDbCache.Tests.Infrastructure
             var useMongoClientSettings =
                 Environment.GetEnvironmentVariable("MongoDbCacheTestsUseMongoClientSettings") == "true";
             
-            return new MongoDbCache(useMongoClientSettings ? CreateOptionsWithMongoClientSettings() : CreateOptions());
+            return new Nefarius.AspNetCore.MongoDbCache.MongoDbCache(useMongoClientSettings ? CreateOptionsWithMongoClientSettings() : CreateOptions());
         }
 
         public static MongoDbCacheOptions CreateOptions()

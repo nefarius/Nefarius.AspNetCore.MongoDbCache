@@ -1,27 +1,13 @@
 using System;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace MongoDbCache
+namespace Nefarius.AspNetCore.MongoDbCache
 {
     internal class CacheItem
     {
-        [BsonId]
-        public string Key { get; }
-
-        [BsonElement("v")]
-        public byte[] Value { get; }
-
-        [BsonElement("e")]
-        public DateTimeOffset? ExpiresAt { get; private set; }
-
-        [BsonElement("a")]
-        public DateTimeOffset? AbsoluteExpiration { get; }
-
-        [BsonElement("s")]
-        public double? SlidingExpirationInSeconds { get; }
-
         [BsonConstructor]
-        public CacheItem(string key, byte[] value, DateTimeOffset? expiresAt, DateTimeOffset? absoluteExpiration, double? slidingExpirationInSeconds)
+        public CacheItem(string key, byte[] value, DateTimeOffset? expiresAt, DateTimeOffset? absoluteExpiration,
+            double? slidingExpirationInSeconds)
         {
             Key = key;
             Value = value;
@@ -31,11 +17,21 @@ namespace MongoDbCache
         }
 
         [BsonConstructor]
-        public CacheItem(string key, DateTimeOffset? expiresAt, DateTimeOffset? absoluteExpiration, double? slidingExpirationInSeconds)
+        public CacheItem(string key, DateTimeOffset? expiresAt, DateTimeOffset? absoluteExpiration,
+            double? slidingExpirationInSeconds)
             : this(key, null, expiresAt, absoluteExpiration, slidingExpirationInSeconds)
         {
-
         }
+
+        [BsonId] public string Key { get; }
+
+        [BsonElement("v")] public byte[] Value { get; }
+
+        [BsonElement("e")] public DateTimeOffset? ExpiresAt { get; private set; }
+
+        [BsonElement("a")] public DateTimeOffset? AbsoluteExpiration { get; }
+
+        [BsonElement("s")] public double? SlidingExpirationInSeconds { get; }
 
         public CacheItem WithExpiresAt(DateTimeOffset? expiresAt)
         {

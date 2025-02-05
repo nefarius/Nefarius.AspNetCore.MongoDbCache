@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDbCache.Tests.Infrastructure;
+using Nefarius.AspNetCore.MongoDbCache;
 using Xunit;
 
 namespace MongoDbCache.Tests
@@ -50,7 +51,7 @@ namespace MongoDbCache.Tests
 
             Assert.NotNull(distributedCache);
             Assert.Equal(ServiceLifetime.Singleton, distributedCache.Lifetime);
-            Assert.IsType<MongoDbCache>(serviceProvider.GetRequiredService<IDistributedCache>());
+            Assert.IsType<Nefarius.AspNetCore.MongoDbCache.MongoDbCache>(serviceProvider.GetRequiredService<IDistributedCache>());
         }
     }
 }

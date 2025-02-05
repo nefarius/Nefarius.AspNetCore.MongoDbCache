@@ -1,20 +1,42 @@
 using System;
-using System.Threading.Tasks;
-using MongoDB.Driver;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
+using MongoDB.Driver;
 
-namespace MongoDbCache
+namespace Nefarius.AspNetCore.MongoDbCache
 {
     internal class MongoContext
     {
         private readonly IMongoCollection<CacheItem> _collection;
 
+        public MongoContext(string connectionString, MongoClientSettings mongoClientSettings, string databaseName,
+            string collectionName)
+        {
+            var client = mongoClientSettings == null
+                ? new MongoClient(connectionString)
+                : new MongoClient(mongoClientSettings);
+            var database = client.GetDatabase(databaseName);
+
+            var expireAtIndexModel = new IndexKeysDefinitionBuilder<CacheItem>().Ascending(p => p.ExpiresAt);
+
+            _collection = database.GetCollection<CacheItem>(collectionName);
+
+            _collection.Indexes.CreateOne(new CreateIndexModel<CacheItem>(expireAtIndexModel, new CreateIndexOptions
+            {
+                Background = true
+            }));
+        }
+
         private static FilterDefinition<CacheItem> FilterByKey(string key)
-            => Builders<CacheItem>.Filter.Eq(x => x.Key, key);
+        {
+            return Builders<CacheItem>.Filter.Eq(x => x.Key, key);
+        }
 
         private static FilterDefinition<CacheItem> FilterByExpiresAtNotNull()
-            => Builders<CacheItem>.Filter.Ne(x => x.ExpiresAt, null);
+        {
+            return Builders<CacheItem>.Filter.Ne(x => x.ExpiresAt, null);
+        }
 
         private IFindFluent<CacheItem, CacheItem> GetItemQuery(string key, bool withoutValue)
         {
@@ -26,9 +48,12 @@ namespace MongoDbCache
         }
 
         private static bool CheckIfExpired(DateTimeOffset utcNow, CacheItem cacheItem)
-            => cacheItem?.ExpiresAt <= utcNow;
+        {
+            return cacheItem?.ExpiresAt <= utcNow;
+        }
 
-        private static DateTimeOffset? GetExpiresAt(DateTimeOffset utcNow, double? slidingExpirationInSeconds, DateTimeOffset? absoluteExpiration)
+        private static DateTimeOffset? GetExpiresAt(DateTimeOffset utcNow, double? slidingExpirationInSeconds,
+            DateTimeOffset? absoluteExpiration)
         {
             if (slidingExpirationInSeconds == null && absoluteExpiration == null)
                 return null;
@@ -48,7 +73,8 @@ namespace MongoDbCache
             if (cacheItem.ExpiresAt == null)
                 return cacheItem;
 
-            var absoluteExpiration = GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
+            var absoluteExpiration =
+                GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
             _collection.UpdateOne(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
                 Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
 
@@ -60,30 +86,18 @@ namespace MongoDbCache
             if (cacheItem.ExpiresAt == null)
                 return cacheItem;
 
-            var absoluteExpiration = GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
+            var absoluteExpiration =
+                GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
             await _collection.UpdateOneAsync(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
                 Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
 
             return cacheItem.WithExpiresAt(absoluteExpiration);
         }
 
-        public MongoContext(string connectionString, MongoClientSettings mongoClientSettings, string databaseName, string collectionName)
-        {
-            var client = mongoClientSettings == null ? new MongoClient(connectionString) : new MongoClient(mongoClientSettings);
-            var database = client.GetDatabase(databaseName);
-
-            var expireAtIndexModel = new IndexKeysDefinitionBuilder<CacheItem>().Ascending(p => p.ExpiresAt);
-
-            _collection = database.GetCollection<CacheItem>(collectionName);
-
-            _collection.Indexes.CreateOne(new CreateIndexModel<CacheItem>(expireAtIndexModel, new CreateIndexOptions
-            {
-                Background = true
-            }));
-        }
-
         public void DeleteExpired(DateTimeOffset utcNow)
-            => _collection.DeleteMany(Builders<CacheItem>.Filter.Lte(x => x.ExpiresAt, utcNow));
+        {
+            _collection.DeleteMany(Builders<CacheItem>.Filter.Lte(x => x.ExpiresAt, utcNow));
+        }
 
         public byte[] GetCacheItem(string key, bool withoutValue)
         {
@@ -159,7 +173,8 @@ namespace MongoDbCache
             });
         }
 
-        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options = null, CancellationToken token = default)
+        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options = null,
+            CancellationToken token = default)
         {
             var utcNow = DateTimeOffset.UtcNow;
 
@@ -188,9 +203,13 @@ namespace MongoDbCache
         }
 
         public void Remove(string key)
-            => _collection.DeleteOne(FilterByKey(key));
+        {
+            _collection.DeleteOne(FilterByKey(key));
+        }
 
         public async Task RemoveAsync(string key, CancellationToken token = default)
-            => await _collection.DeleteOneAsync(FilterByKey(key), token);
+        {
+            await _collection.DeleteOneAsync(FilterByKey(key), token);
+        }
     }
 }
