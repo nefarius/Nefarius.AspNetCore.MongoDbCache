@@ -3,7 +3,7 @@
 Namespace: Nefarius.AspNetCore.MongoDbCache
 
 ```csharp
-public class MongoDbCacheOptions : Microsoft.Extensions.Options.IOptions`1[[Nefarius.AspNetCore.MongoDbCache.MongoDbCacheOptions, Nefarius.AspNetCore.MongoDbCache, Version=2.5.0.0, Culture=neutral, PublicKeyToken=null]]
+public class MongoDbCacheOptions : Microsoft.Extensions.Options.IOptions`1[[Nefarius.AspNetCore.MongoDbCache.MongoDbCacheOptions, Nefarius.AspNetCore.MongoDbCache, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]
 ```
 
 Inheritance [Object](https://docs.microsoft.com/en-us/dotnet/api/system.object) → [MongoDbCacheOptions](./nefarius.aspnetcore.mongodbcache.mongodbcacheoptions.md)<br>
