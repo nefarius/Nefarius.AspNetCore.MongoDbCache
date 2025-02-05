@@ -1,215 +1,243 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Microsoft.Extensions.Caching.Distributed;
+
 using MongoDB.Driver;
 
-namespace Nefarius.AspNetCore.MongoDbCache
+namespace Nefarius.AspNetCore.MongoDbCache;
+
+internal class MongoContext
 {
-    internal class MongoContext
+    private readonly IMongoCollection<CacheItem> _collection;
+
+    public MongoContext(string connectionString, MongoClientSettings mongoClientSettings, string databaseName,
+        string collectionName)
     {
-        private readonly IMongoCollection<CacheItem> _collection;
+        MongoClient client = mongoClientSettings == null
+            ? new MongoClient(connectionString)
+            : new MongoClient(mongoClientSettings);
+        IMongoDatabase database = client.GetDatabase(databaseName);
 
-        public MongoContext(string connectionString, MongoClientSettings mongoClientSettings, string databaseName,
-            string collectionName)
+        IndexKeysDefinition<CacheItem> expireAtIndexModel =
+            new IndexKeysDefinitionBuilder<CacheItem>().Ascending(p => p.ExpiresAt);
+
+        _collection = database.GetCollection<CacheItem>(collectionName);
+
+        _collection.Indexes.CreateOne(new CreateIndexModel<CacheItem>(expireAtIndexModel,
+            new CreateIndexOptions { Background = true }));
+    }
+
+    private static FilterDefinition<CacheItem> FilterByKey(string key)
+    {
+        return Builders<CacheItem>.Filter.Eq(x => x.Key, key);
+    }
+
+    private static FilterDefinition<CacheItem> FilterByExpiresAtNotNull()
+    {
+        return Builders<CacheItem>.Filter.Ne(x => x.ExpiresAt, null);
+    }
+
+    private IFindFluent<CacheItem, CacheItem> GetItemQuery(string key, bool withoutValue)
+    {
+        IFindFluent<CacheItem, CacheItem> query = _collection.Find(FilterByKey(key));
+        if (withoutValue)
         {
-            var client = mongoClientSettings == null
-                ? new MongoClient(connectionString)
-                : new MongoClient(mongoClientSettings);
-            var database = client.GetDatabase(databaseName);
-
-            var expireAtIndexModel = new IndexKeysDefinitionBuilder<CacheItem>().Ascending(p => p.ExpiresAt);
-
-            _collection = database.GetCollection<CacheItem>(collectionName);
-
-            _collection.Indexes.CreateOne(new CreateIndexModel<CacheItem>(expireAtIndexModel, new CreateIndexOptions
-            {
-                Background = true
-            }));
+            query = query.Project<CacheItem>(Builders<CacheItem>.Projection.Exclude(x => x.Value));
         }
 
-        private static FilterDefinition<CacheItem> FilterByKey(string key)
+        return query;
+    }
+
+    private static bool CheckIfExpired(DateTimeOffset utcNow, CacheItem cacheItem)
+    {
+        return cacheItem?.ExpiresAt <= utcNow;
+    }
+
+    private static DateTimeOffset? GetExpiresAt(DateTimeOffset utcNow, double? slidingExpirationInSeconds,
+        DateTimeOffset? absoluteExpiration)
+    {
+        if (slidingExpirationInSeconds == null && absoluteExpiration == null)
         {
-            return Builders<CacheItem>.Filter.Eq(x => x.Key, key);
+            return null;
         }
 
-        private static FilterDefinition<CacheItem> FilterByExpiresAtNotNull()
+        if (slidingExpirationInSeconds == null)
         {
-            return Builders<CacheItem>.Filter.Ne(x => x.ExpiresAt, null);
+            return absoluteExpiration;
         }
 
-        private IFindFluent<CacheItem, CacheItem> GetItemQuery(string key, bool withoutValue)
-        {
-            var query = _collection.Find(FilterByKey(key));
-            if (withoutValue)
-                query = query.Project<CacheItem>(Builders<CacheItem>.Projection.Exclude(x => x.Value));
+        double seconds = slidingExpirationInSeconds.GetValueOrDefault();
 
-            return query;
+        return utcNow.AddSeconds(seconds) > absoluteExpiration
+            ? absoluteExpiration
+            : utcNow.AddSeconds(seconds);
+    }
+
+    private CacheItem UpdateExpiresAtIfRequired(DateTimeOffset utcNow, CacheItem cacheItem)
+    {
+        if (cacheItem.ExpiresAt == null)
+        {
+            return cacheItem;
         }
 
-        private static bool CheckIfExpired(DateTimeOffset utcNow, CacheItem cacheItem)
+        DateTimeOffset? absoluteExpiration =
+            GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
+        _collection.UpdateOne(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
+            Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
+
+        return cacheItem.WithExpiresAt(absoluteExpiration);
+    }
+
+    private async Task<CacheItem> UpdateExpiresAtIfRequiredAsync(DateTimeOffset utcNow, CacheItem cacheItem)
+    {
+        if (cacheItem.ExpiresAt == null)
         {
-            return cacheItem?.ExpiresAt <= utcNow;
+            return cacheItem;
         }
 
-        private static DateTimeOffset? GetExpiresAt(DateTimeOffset utcNow, double? slidingExpirationInSeconds,
-            DateTimeOffset? absoluteExpiration)
+        DateTimeOffset? absoluteExpiration =
+            GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
+        await _collection.UpdateOneAsync(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
+            Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
+
+        return cacheItem.WithExpiresAt(absoluteExpiration);
+    }
+
+    public void DeleteExpired(DateTimeOffset utcNow)
+    {
+        _collection.DeleteMany(Builders<CacheItem>.Filter.Lte(x => x.ExpiresAt, utcNow));
+    }
+
+    public byte[] GetCacheItem(string key, bool withoutValue)
+    {
+        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+
+        if (key == null)
         {
-            if (slidingExpirationInSeconds == null && absoluteExpiration == null)
-                return null;
-
-            if (slidingExpirationInSeconds == null)
-                return absoluteExpiration;
-
-            var seconds = slidingExpirationInSeconds.GetValueOrDefault();
-
-            return utcNow.AddSeconds(seconds) > absoluteExpiration
-                ? absoluteExpiration
-                : utcNow.AddSeconds(seconds);
+            return null;
         }
 
-        private CacheItem UpdateExpiresAtIfRequired(DateTimeOffset utcNow, CacheItem cacheItem)
+        IFindFluent<CacheItem, CacheItem> query = GetItemQuery(key, withoutValue);
+        CacheItem cacheItem = query.SingleOrDefault();
+        if (cacheItem == null)
         {
-            if (cacheItem.ExpiresAt == null)
-                return cacheItem;
-
-            var absoluteExpiration =
-                GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
-            _collection.UpdateOne(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
-                Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
-
-            return cacheItem.WithExpiresAt(absoluteExpiration);
+            return null;
         }
 
-        private async Task<CacheItem> UpdateExpiresAtIfRequiredAsync(DateTimeOffset utcNow, CacheItem cacheItem)
+        if (CheckIfExpired(utcNow, cacheItem))
         {
-            if (cacheItem.ExpiresAt == null)
-                return cacheItem;
-
-            var absoluteExpiration =
-                GetExpiresAt(utcNow, cacheItem.SlidingExpirationInSeconds, cacheItem.AbsoluteExpiration);
-            await _collection.UpdateOneAsync(FilterByKey(cacheItem.Key) & FilterByExpiresAtNotNull(),
-                Builders<CacheItem>.Update.Set(x => x.ExpiresAt, absoluteExpiration));
-
-            return cacheItem.WithExpiresAt(absoluteExpiration);
+            Remove(cacheItem.Key);
+            return null;
         }
 
-        public void DeleteExpired(DateTimeOffset utcNow)
+        cacheItem = UpdateExpiresAtIfRequired(utcNow, cacheItem);
+
+        return cacheItem?.Value;
+    }
+
+    public async Task<byte[]> GetCacheItemAsync(string key, bool withoutValue, CancellationToken token = default)
+    {
+        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+
+        if (key == null)
         {
-            _collection.DeleteMany(Builders<CacheItem>.Filter.Lte(x => x.ExpiresAt, utcNow));
+            return null;
         }
 
-        public byte[] GetCacheItem(string key, bool withoutValue)
+        IFindFluent<CacheItem, CacheItem> query = GetItemQuery(key, withoutValue);
+        CacheItem cacheItem = await query.SingleOrDefaultAsync(token);
+        if (cacheItem == null)
         {
-            var utcNow = DateTimeOffset.UtcNow;
-
-            if (key == null)
-                return null;
-
-            var query = GetItemQuery(key, withoutValue);
-            var cacheItem = query.SingleOrDefault();
-            if (cacheItem == null)
-                return null;
-
-            if (CheckIfExpired(utcNow, cacheItem))
-            {
-                Remove(cacheItem.Key);
-                return null;
-            }
-
-            cacheItem = UpdateExpiresAtIfRequired(utcNow, cacheItem);
-
-            return cacheItem?.Value;
+            return null;
         }
 
-        public async Task<byte[]> GetCacheItemAsync(string key, bool withoutValue, CancellationToken token = default)
+        if (CheckIfExpired(utcNow, cacheItem))
         {
-            var utcNow = DateTimeOffset.UtcNow;
-
-            if (key == null)
-                return null;
-
-            var query = GetItemQuery(key, withoutValue);
-            var cacheItem = await query.SingleOrDefaultAsync(token);
-            if (cacheItem == null)
-                return null;
-
-            if (CheckIfExpired(utcNow, cacheItem))
-            {
-                await RemoveAsync(cacheItem.Key, token);
-                return null;
-            }
-
-            cacheItem = await UpdateExpiresAtIfRequiredAsync(utcNow, cacheItem);
-
-            return cacheItem?.Value;
+            await RemoveAsync(cacheItem.Key, token);
+            return null;
         }
 
-        public void Set(string key, byte[] value, DistributedCacheEntryOptions options = null)
+        cacheItem = await UpdateExpiresAtIfRequiredAsync(utcNow, cacheItem);
+
+        return cacheItem?.Value;
+    }
+
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options = null)
+    {
+        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+
+        if (key == null)
         {
-            var utcNow = DateTimeOffset.UtcNow;
-
-            if (key == null)
-                throw new ArgumentNullException(nameof(key));
-
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            var absolutExpiration = options?.AbsoluteExpiration;
-            var slidingExpirationInSeconds = options?.SlidingExpiration?.TotalSeconds;
-
-            if (options?.AbsoluteExpirationRelativeToNow != null)
-                absolutExpiration = utcNow.Add(options.AbsoluteExpirationRelativeToNow.Value);
-
-            if (absolutExpiration <= utcNow)
-                throw new InvalidOperationException("The absolute expiration value must be in the future.");
-
-            var expiresAt = GetExpiresAt(utcNow, slidingExpirationInSeconds, absolutExpiration);
-            var cacheItem = new CacheItem(key, value, expiresAt, absolutExpiration, slidingExpirationInSeconds);
-
-            _collection.ReplaceOne(FilterByKey(key), cacheItem, new ReplaceOptions
-            {
-                IsUpsert = true
-            });
+            throw new ArgumentNullException(nameof(key));
         }
 
-        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options = null,
-            CancellationToken token = default)
+        if (value == null)
         {
-            var utcNow = DateTimeOffset.UtcNow;
-
-            if (key == null)
-                throw new ArgumentNullException(nameof(key));
-
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            var absolutExpiration = options?.AbsoluteExpiration;
-            var slidingExpirationInSeconds = options?.SlidingExpiration?.TotalSeconds;
-
-            if (options?.AbsoluteExpirationRelativeToNow != null)
-                absolutExpiration = utcNow.Add(options.AbsoluteExpirationRelativeToNow.Value);
-
-            if (absolutExpiration <= utcNow)
-                throw new InvalidOperationException("The absolute expiration value must be in the future.");
-
-            var expiresAt = GetExpiresAt(utcNow, slidingExpirationInSeconds, absolutExpiration);
-            var cacheItem = new CacheItem(key, value, expiresAt, absolutExpiration, slidingExpirationInSeconds);
-
-            await _collection.ReplaceOneAsync(FilterByKey(key), cacheItem, new ReplaceOptions
-            {
-                IsUpsert = true
-            }, token);
+            throw new ArgumentNullException(nameof(value));
         }
 
-        public void Remove(string key)
+        DateTimeOffset? absolutExpiration = options?.AbsoluteExpiration;
+        double? slidingExpirationInSeconds = options?.SlidingExpiration?.TotalSeconds;
+
+        if (options?.AbsoluteExpirationRelativeToNow != null)
         {
-            _collection.DeleteOne(FilterByKey(key));
+            absolutExpiration = utcNow.Add(options.AbsoluteExpirationRelativeToNow.Value);
         }
 
-        public async Task RemoveAsync(string key, CancellationToken token = default)
+        if (absolutExpiration <= utcNow)
         {
-            await _collection.DeleteOneAsync(FilterByKey(key), token);
+            throw new InvalidOperationException("The absolute expiration value must be in the future.");
         }
+
+        DateTimeOffset? expiresAt = GetExpiresAt(utcNow, slidingExpirationInSeconds, absolutExpiration);
+        CacheItem cacheItem = new(key, value, expiresAt, absolutExpiration, slidingExpirationInSeconds);
+
+        _collection.ReplaceOne(FilterByKey(key), cacheItem, new ReplaceOptions { IsUpsert = true });
+    }
+
+    public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options = null,
+        CancellationToken token = default)
+    {
+        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+
+        if (key == null)
+        {
+            throw new ArgumentNullException(nameof(key));
+        }
+
+        if (value == null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        DateTimeOffset? absolutExpiration = options?.AbsoluteExpiration;
+        double? slidingExpirationInSeconds = options?.SlidingExpiration?.TotalSeconds;
+
+        if (options?.AbsoluteExpirationRelativeToNow != null)
+        {
+            absolutExpiration = utcNow.Add(options.AbsoluteExpirationRelativeToNow.Value);
+        }
+
+        if (absolutExpiration <= utcNow)
+        {
+            throw new InvalidOperationException("The absolute expiration value must be in the future.");
+        }
+
+        DateTimeOffset? expiresAt = GetExpiresAt(utcNow, slidingExpirationInSeconds, absolutExpiration);
+        CacheItem cacheItem = new(key, value, expiresAt, absolutExpiration, slidingExpirationInSeconds);
+
+        await _collection.ReplaceOneAsync(FilterByKey(key), cacheItem, new ReplaceOptions { IsUpsert = true }, token);
+    }
+
+    public void Remove(string key)
+    {
+        _collection.DeleteOne(FilterByKey(key));
+    }
+
+    public async Task RemoveAsync(string key, CancellationToken token = default)
+    {
+        await _collection.DeleteOneAsync(FilterByKey(key), token);
     }
 }
