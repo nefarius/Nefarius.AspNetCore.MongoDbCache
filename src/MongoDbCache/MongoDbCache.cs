@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -37,7 +38,7 @@ public class MongoDbCache : IDistributedCache
     }
 
     /// <inheritdoc />
-    public void Set(string key, byte[] value, DistributedCacheEntryOptions options = null)
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions? options = null)
     {
         _mongoContext.Set(key, value, options);
 
@@ -53,7 +54,7 @@ public class MongoDbCache : IDistributedCache
     }
 
     /// <inheritdoc />
-    public async Task<byte[]> GetAsync(string key, CancellationToken token = default)
+    public async Task<byte[]?> GetAsync(string key, CancellationToken token = default)
     {
         byte[] value = await _mongoContext.GetCacheItemAsync(key, false, token);
 
