@@ -5,8 +5,8 @@
 [![Nuget](https://img.shields.io/nuget/v/Nefarius.AspNetCore.MongoDbCache)](https://www.nuget.org/packages/Nefarius.AspNetCore.MongoDbCache/)
 [![Nuget](https://img.shields.io/nuget/dt/Nefarius.AspNetCore.MongoDbCache)](https://www.nuget.org/packages/Nefarius.AspNetCore.MongoDbCache/)
 
-A distributed cache implementation based on MongoDb, inspired by RedisCache and SqlServerCache (
-see https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed).
+A [distributed cache implementation](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed) using
+MongoDb.
 
 ### How do I get started?
 
@@ -46,5 +46,5 @@ public void ConfigureServices(IServiceCollection services)
 }
 ```
 
-MongoDbCache implements IDistributedCache, therefore you can use all the sync and async methods provided by the
+MongoDbCache implements IDistributedCache, therefore, you can use all the sync and async methods provided by the
 interface, please see https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed.
