@@ -1,4 +1,5 @@
 ﻿#nullable enable
+
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,6 +17,9 @@ public class MongoDbCache : IDistributedCache
     private DateTimeOffset _lastScan = DateTimeOffset.UtcNow;
     private TimeSpan _scanInterval;
 
+    /// <summary>
+    ///     Provides a MongoDB-based implementation of <see cref="IDistributedCache" />.
+    /// </summary>
     public MongoDbCache(IOptions<MongoDbCacheOptions> optionsAccessor)
     {
         MongoDbCacheOptions options = optionsAccessor.Value;

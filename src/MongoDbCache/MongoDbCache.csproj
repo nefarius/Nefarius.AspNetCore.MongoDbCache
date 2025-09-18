@@ -7,8 +7,8 @@
         <Copyright>Copyright (c) OUTMATIC Alessandro Petrelli &amp; Contributors</Copyright>
         <Authors>Alessandro Petrelli &amp; Contributors</Authors>
         <Company>OUTMATIC Alessandro Petrelli</Company>
-        <PackageProjectUrl>https://github.com/outmatic/MongoDbCache</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/outmatic/MongoDbCache</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/nefarius/Nefarius.AspNetCore.MongoDbCache</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/nefarius/Nefarius.AspNetCore.MongoDbCache</RepositoryUrl>
         <Description>A distributed cache implementation based on MongoDb, inspired by RedisCache and SqlServerCache</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <AssemblyName>Nefarius.AspNetCore.MongoDbCache</AssemblyName>
