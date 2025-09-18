@@ -13,6 +13,8 @@ Implements IDistributedCache
 
 ### <a id="constructors-.ctor"/>**MongoDbCache(IOptions&lt;MongoDbCacheOptions&gt;)**
 
+Provides a MongoDB-based implementation of .
+
 ```csharp
 public MongoDbCache(IOptions<MongoDbCacheOptions> optionsAccessor)
 ```
