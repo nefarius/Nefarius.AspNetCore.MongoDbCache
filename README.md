@@ -42,7 +42,7 @@ public void ConfigureServices(IServiceCollection services)
 		options.MongoClientSettings = mongoSettings;
 		options.DatabaseName = "MongoCache";
 		options.CollectionName = "appcache";
-		options.ExpiredScanInterval = TimeSpan.FromMinutes(10;
+		options.ExpiredScanInterval = TimeSpan.FromMinutes(10);
 	});
 }
 ```
