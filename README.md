@@ -35,7 +35,7 @@ public void ConfigureServices(IServiceCollection services)
 ```csharp
 public void ConfigureServices(IServiceCollection services)
 {  
-    	var mongoSettings = new MongoClientSettings();
+    var mongoSettings = new MongoClientSettings();
 
 	services.AddMongoDbCache(options =>
 	{
