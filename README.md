@@ -2,6 +2,7 @@
 
 [![.NET](https://github.com/nefarius/Nefarius.AspNetCore.MongoDbCache/actions/workflows/build.yml/badge.svg)](https://github.com/nefarius/Nefarius.AspNetCore.MongoDbCache/actions/workflows/build.yml)
 ![Requirements](https://img.shields.io/badge/Requires-.NET%20Standard%202.1-blue.svg)
+![MongoDB Driver](https://img.shields.io/badge/MongoDB%20Driver-3.5.0-green?logo=mongodb)
 [![Nuget](https://img.shields.io/nuget/v/Nefarius.AspNetCore.MongoDbCache)](https://www.nuget.org/packages/Nefarius.AspNetCore.MongoDbCache/)
 [![Nuget](https://img.shields.io/nuget/dt/Nefarius.AspNetCore.MongoDbCache)](https://www.nuget.org/packages/Nefarius.AspNetCore.MongoDbCache/)
 
